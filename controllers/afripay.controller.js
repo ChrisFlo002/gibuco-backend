@@ -73,33 +73,30 @@ export const redirectToAfriPay = async (req, res) => {
     // --- CSP nonce + header ---
     const nonce = crypto.randomBytes(16).toString("base64");
     // Allow our own inline script (via nonce) and allow posting the form to Afripay
-    res.set("Content-Security-Policy",
-      [
-        "default-src 'self'",
-        "base-uri 'none'",
-        "frame-ancestors 'none'",
-        "connect-src 'self'",
-        `script-src 'self' 'nonce-${nonce}'`,          // allow only our tiny script
-        `form-action 'self' ${new URL(process.env.AFRIPAY_CHECKOUT_URL).origin}`, // allow POST to AfriPay
-        // optional: style-src 'self' 'unsafe-inline' if you add inline styles
-      ].join("; ")
-    );
+    res.set("Content-Security-Policy", [
+      "default-src 'self'",
+      "base-uri 'none'",
+      "frame-ancestors 'none'",
+      "connect-src 'self'",
+      `script-src 'self' 'nonce-${nonce}'`,
+      `form-action 'self' ${new URL(process.env.AFRIPAY_CHECKOUT_URL).origin}`,
+    ].join("; "));
 
     const hiddenInput = (n, v) => `<input type="hidden" name="${n}" value="${String(v)}" />`;
-
 
     const html = `<!doctype html>
 <html>
 <head><meta charset="utf-8"><title>Redirecting to AfriPay…</title></head>
-<body onload="document.forms[0].submit()" style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial;">
+<body style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial;">
   <div style="max-width:560px;margin:64px auto;padding:24px;border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,0.08)">
     <h1 style="font-size:20px;margin:0 0 12px">Redirecting to AfriPay…</h1>
     <p style="opacity:.8;margin:0 0 8px">Please wait while we open the secure payment page.</p>
-    <form method="post" action="${process.env.AFRIPAY_CHECKOUT_URL}">
+    <form id="afripayForm" method="post" action="${process.env.AFRIPAY_CHECKOUT_URL}">
       ${Object.entries(formFields).map(([k, v]) => hiddenInput(k, v)).join("\n")}
       <noscript><button type="submit" style="padding:10px 16px;border-radius:10px;border:0">Continue</button></noscript>
     </form>
   </div>
+  <script nonce="${nonce}">document.getElementById('afripayForm').submit();</script>
 </body>
 </html>`;
 
@@ -169,7 +166,7 @@ export const afriPayCallback = async (req, res) => {
 // Frontend polling or manual check: returns { status: pending|success|error }
 export const trackPayment = async (req, res) => {
   try {
-    const p = await Payment.findById(req.params.pid).select("statut");
+    const p = await Payment.findById(req.params.id).select("statut");
     if (!p) return res.status(404).json({ status: "error", message: "Not found" });
 
     const status =
