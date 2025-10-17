@@ -20,7 +20,7 @@ const paymentSchema = new mongoose.Schema(
     },
     methodePaiement: {
       type: String,
-      enum: ["Lumicash", "cash", "Ecocash", "Enoti"],
+      enum: ["Lumicash", "cash", "Ecocash", "Enoti","AfriPay"],
       required: true,
     },
     datePaiement: {
