@@ -15,7 +15,7 @@ import crypto from "crypto";
  */
 
 // Helper to build hidden inputs
-const hiddenInput = (name, value) => `<input type="hidden" name="${name}" value="${String(value)}" />`;
+//const hiddenInput = (name, value) => `<input type="hidden" name="${name}" value="${String(value)}" />`;
 
 // POST /api/payments/afripay/initiate
 // 1) Create a pending Payment
@@ -70,6 +70,23 @@ export const redirectToAfriPay = async (req, res) => {
       return_url: process.env.PUBLIC_RETURN_URL,  // browser will go here after OTP
       callback_url: `${process.env.BASE_URL}/api/payments/afripay/callback`, // webhook to this backend
     };
+    // --- CSP nonce + header ---
+    const nonce = crypto.randomBytes(16).toString("base64");
+    // Allow our own inline script (via nonce) and allow posting the form to Afripay
+    res.set("Content-Security-Policy",
+      [
+        "default-src 'self'",
+        "base-uri 'none'",
+        "frame-ancestors 'none'",
+        "connect-src 'self'",
+        `script-src 'self' 'nonce-${nonce}'`,          // allow only our tiny script
+        `form-action 'self' ${new URL(process.env.AFRIPAY_CHECKOUT_URL).origin}`, // allow POST to AfriPay
+        // optional: style-src 'self' 'unsafe-inline' if you add inline styles
+      ].join("; ")
+    );
+
+    const hiddenInput = (n, v) => `<input type="hidden" name="${n}" value="${String(v)}" />`;
+
 
     const html = `<!doctype html>
 <html>
@@ -79,7 +96,7 @@ export const redirectToAfriPay = async (req, res) => {
     <h1 style="font-size:20px;margin:0 0 12px">Redirecting to AfriPay…</h1>
     <p style="opacity:.8;margin:0 0 8px">Please wait while we open the secure payment page.</p>
     <form method="post" action="${process.env.AFRIPAY_CHECKOUT_URL}">
-      ${Object.entries(formFields).map(([k,v]) => hiddenInput(k, v)).join("\n")}
+      ${Object.entries(formFields).map(([k, v]) => hiddenInput(k, v)).join("\n")}
       <noscript><button type="submit" style="padding:10px 16px;border-radius:10px;border:0">Continue</button></noscript>
     </form>
   </div>
@@ -106,7 +123,7 @@ export const afriPayCallback = async (req, res) => {
     // Skipped because spec not provided.
 
     const payment = await Payment.findOne({
-        _id: client_token,
+      _id: client_token,
     }).populate({ path: "reservationId", populate: { path: "trajetId" } });
 
     if (!payment) {
@@ -157,8 +174,8 @@ export const trackPayment = async (req, res) => {
 
     const status =
       p.statut === "complete" ? "success" :
-      p.statut === "echoue"   ? "error"   :
-      "pending";
+        p.statut === "echoue" ? "error" :
+          "pending";
 
     return res.json({ status });
   } catch (err) {
