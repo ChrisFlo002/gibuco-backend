@@ -112,7 +112,28 @@ export const redirectToAfriPay = async (req, res) => {
 // AfriPay -> this backend. Updates DB to complete/échoué, adjusts reservation + seats.
 export const afriPayCallback = async (req, res) => {
   try {
-    const { status, amount, currency, transaction_ref, payment_method, client_token } = req.body || {};
+    const hasBody  = req.body  && Object.keys(req.body).length  > 0;
+    const hasQuery = req.query && Object.keys(req.query).length > 0;
+
+    if (!hasBody && !hasQuery) {
+      return res.status(400).json({
+        success: false,
+        message: "No data received in body or query.",
+      });
+    }
+
+    // Prefer body; if empty, use query
+    const src = hasBody ? req.body : req.query;
+
+    const {
+      status,
+      amount,
+      currency,
+      transaction_ref,
+      payment_method,
+      client_token,
+    } = src;
+   // const { status, amount, currency, transaction_ref, payment_method, client_token } = req.body || {};
 
     if (!status) return res.status(400).json({ success: false, message: "Missing status" });
 
